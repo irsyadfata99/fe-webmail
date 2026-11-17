@@ -1,79 +1,59 @@
-import {
-  ChevronLeft,
-  ChevronRight,
-  Paperclip,
-  RefreshCw,
-  Star,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { useState } from "react";
 import { useParams, useSearchParams } from "react-router";
+import { ApiError } from "@/api/client";
+import { mailApi } from "@/api/mail";
 import { Button } from "@/components/ui/button";
-import { displayName, formatListDate } from "@/lib/format";
+import { useCompose } from "@/features/compose/compose-context";
 import { cn } from "@/lib/utils";
-import type { MessageSummary } from "@/types/mail";
+import { ActionBar } from "./ActionBar";
+import { useMailActions } from "./actions";
 import { useFolders, useMessages, useSetFlags } from "./hooks";
+import { MessageRow } from "./MessageRow";
 import MessageReader from "./MessageReader";
 
-function MessageRow({
-  m,
-  selected,
-  showRecipient,
-  onOpen,
-  onStar,
+function EmptyFolderButton({
+  folder,
+  label,
 }: {
-  m: MessageSummary;
-  selected: boolean;
-  showRecipient: boolean;
-  onOpen: () => void;
-  onStar: () => void;
+  folder: string;
+  label: string;
 }) {
-  const who = showRecipient
-    ? `To: ${displayName(m.to[0])}`
-    : displayName(m.from[0]);
-  const weight = m.seen ? "font-normal" : "font-semibold";
+  const actions = useMailActions(folder);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  if (!confirming) {
+    return (
+      <Button variant="ghost" size="sm" onClick={() => setConfirming(true)}>
+        Empty {label} now
+      </Button>
+    );
+  }
   return (
-    <div
-      className={cn(
-        "flex items-center gap-1 border-b px-2 transition-colors hover:bg-muted",
-        selected && "bg-accent",
-      )}
-    >
-      <button
-        type="button"
-        onClick={onStar}
-        aria-label={m.flagged ? "Remove star" : "Add star"}
-        aria-pressed={m.flagged}
-        className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+    <div role="alert" className="flex items-center gap-2 text-sm">
+      <span>Delete everything in {label}?</span>
+      <Button
+        size="sm"
+        variant="destructive"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          void actions.emptyFolder().finally(() => {
+            setBusy(false);
+            setConfirming(false);
+          });
+        }}
       >
-        <Star
-          className={cn(
-            "size-[18px]",
-            m.flagged && "fill-[var(--gold)] text-[var(--gold)]",
-          )}
-        />
-      </button>
-      <button
-        type="button"
-        onClick={onOpen}
-        className="flex min-h-14 min-w-0 flex-1 items-center gap-3 py-2 text-left"
+        Empty
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={busy}
+        onClick={() => setConfirming(false)}
       >
-        <span className={cn("w-32 shrink-0 truncate text-sm sm:w-40", weight)}>
-          {who}
-        </span>
-        <span className="flex min-w-0 flex-1 items-center gap-2 text-sm">
-          <span className={cn("truncate", weight)}>
-            {m.subject || "(no subject)"}
-          </span>
-        </span>
-        {m.hasAttachments && (
-          <Paperclip
-            className="size-4 shrink-0 text-muted-foreground"
-            aria-label="Has attachment"
-          />
-        )}
-        <span className={cn("w-14 shrink-0 text-right text-xs", weight)}>
-          {formatListDate(m.date)}
-        </span>
-      </button>
+        Cancel
+      </Button>
     </div>
   );
 }
@@ -90,8 +70,57 @@ export default function MailPage() {
   );
   const { data: folders } = useFolders();
   const setFlags = useSetFlags(folder);
-  const role = folders?.find((f) => f.path === folder)?.role ?? "other";
+  const compose = useCompose();
+  const [openError, setOpenError] = useState<string | null>(null);
+
+  // Selection belongs to one folder + page; changing either clears it.
+  const selectionKey = `${folder}:${page}`;
+  const [selection, setSelection] = useState<{ key: string; uids: number[] }>({
+    key: selectionKey,
+    uids: [],
+  });
+  const selected = selection.key === selectionKey ? selection.uids : [];
+  const setSelected = (uids: number[]) =>
+    setSelection({ key: selectionKey, uids });
+
+  const folderInfo = folders?.find((f) => f.path === folder);
+  const role = folderInfo?.role ?? "other";
   const showRecipient = role === "sent" || role === "drafts";
+  const allChecked =
+    !!data &&
+    data.messages.length > 0 &&
+    selected.length === data.messages.length;
+
+  // Messages in Drafts reopen in the compose window instead of the reading pane.
+  async function openDraft(draftUid: number) {
+    setOpenError(null);
+    try {
+      const d = await mailApi.savedDraft(draftUid);
+      const esc = (t: string) =>
+        t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      compose.open({
+        to: d.to,
+        cc: d.cc,
+        bcc: d.bcc,
+        subject: d.subject,
+        html:
+          d.html ??
+          d.text
+            .split(/\r?\n/)
+            .map((l) => `<p>${esc(l)}</p>`)
+            .join(""),
+        inReplyTo: d.inReplyTo ?? undefined,
+        references: d.references,
+        original: d.original ?? undefined,
+        draft: { uid: d.uid, attachments: d.attachments },
+        noSignature: true,
+      });
+    } catch (err) {
+      setOpenError(
+        err instanceof ApiError ? err.message : "Could not open the draft.",
+      );
+    }
+  }
 
   function go(next: { uid?: number | null; page?: number }) {
     const p = new URLSearchParams(params);
@@ -116,14 +145,56 @@ export default function MailPage() {
         )}
       >
         <div className="flex h-13 shrink-0 items-center gap-1 border-b px-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Refresh"
-            onClick={() => void refetch()}
-          >
-            <RefreshCw className={cn("size-4", isFetching && "animate-spin")} />
-          </Button>
+          <input
+            type="checkbox"
+            aria-label="Select all"
+            checked={allChecked}
+            disabled={!data || data.messages.length === 0}
+            onChange={(e) =>
+              setSelected(
+                e.target.checked && data ? data.messages.map((m) => m.uid) : [],
+              )
+            }
+            className="mx-2 size-4 cursor-pointer accent-[var(--gold)]"
+          />
+          {selected.length > 0 ? (
+            <>
+              <span className="mr-1 text-sm text-muted-foreground">
+                {selected.length} selected
+              </span>
+              <ActionBar
+                folder={folder}
+                role={role}
+                uids={selected}
+                bulk
+                onDone={() => {
+                  setSelected([]);
+                  if (uid && selected.includes(uid)) go({ uid: null });
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Refresh"
+                onClick={() => void refetch()}
+              >
+                <RefreshCw
+                  className={cn("size-4", isFetching && "animate-spin")}
+                />
+              </Button>
+              {(role === "trash" || role === "junk") &&
+                data &&
+                data.total > 0 && (
+                  <EmptyFolderButton
+                    folder={folder}
+                    label={role === "trash" ? "Trash" : "Spam"}
+                  />
+                )}
+            </>
+          )}
           <div className="flex-1" />
           {data && data.total > 0 && (
             <span className="text-xs text-muted-foreground">
@@ -151,6 +222,11 @@ export default function MailPage() {
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
+          {openError && (
+            <p role="alert" className="px-4 py-2 text-sm text-destructive">
+              {openError}
+            </p>
+          )}
           {isPending && (
             <p className="p-6 text-sm text-muted-foreground">
               Loading messages...
@@ -184,7 +260,17 @@ export default function MailPage() {
               m={m}
               selected={m.uid === uid}
               showRecipient={showRecipient}
-              onOpen={() => go({ uid: m.uid })}
+              checked={selected.includes(m.uid)}
+              onCheck={(on) =>
+                setSelected(
+                  on
+                    ? [...selected, m.uid]
+                    : selected.filter((u) => u !== m.uid),
+                )
+              }
+              onOpen={() =>
+                role === "drafts" ? void openDraft(m.uid) : go({ uid: m.uid })
+              }
               onStar={() =>
                 setFlags.mutate(
                   m.flagged
@@ -208,6 +294,7 @@ export default function MailPage() {
           <MessageReader
             key={`${folder}:${uid}`}
             folder={folder}
+            role={role}
             uid={uid}
             onBack={() => go({ uid: null })}
           />

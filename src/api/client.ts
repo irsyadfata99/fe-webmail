@@ -74,7 +74,10 @@ async function request<T>(
   { body, query, signal }: RequestOptions = {},
 ): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
+  // FormData: browser sets the multipart Content-Type (with boundary) itself.
+  if (body !== undefined && !isForm)
+    headers["Content-Type"] = "application/json";
   if (method !== "GET") {
     const csrf = readCookie("csrf_token");
     if (csrf) headers["X-CSRF-Token"] = csrf;
@@ -86,7 +89,12 @@ async function request<T>(
       method,
       headers,
       credentials: "include",
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body:
+        body === undefined
+          ? undefined
+          : isForm
+            ? (body as FormData)
+            : JSON.stringify(body),
       signal,
     });
   } catch (err) {

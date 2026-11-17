@@ -39,6 +39,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         qc.setQueryData(SESSION_KEY, s);
         return s;
       },
+      verifyTwoFactor: async (factor) => {
+        await authApi.verifyTwoFactor(factor);
+        const s = await authApi.me();
+        qc.setQueryData(SESSION_KEY, s);
+        return s;
+      },
       logout: async () => {
         try {
           await authApi.logout();

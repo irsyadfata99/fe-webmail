@@ -1,10 +1,11 @@
 import { createContext, useContext } from "react";
-import type { SessionInfo } from "@/api/auth";
+import type { SecondFactor, SessionInfo } from "@/api/auth";
 
 export interface AuthState {
   session: SessionInfo | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<SessionInfo>;
+  verifyTwoFactor: (factor: SecondFactor) => Promise<SessionInfo>;
   logout: () => Promise<void>;
 }
 

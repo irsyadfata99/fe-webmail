@@ -1,5 +1,15 @@
-import { ArrowLeft, Calendar, FileText, Star, Video } from "lucide-react";
+import {
+  ArrowLeft,
+  Calendar,
+  FileText,
+  Forward,
+  Reply,
+  ReplyAll,
+  Star,
+  Video,
+} from "lucide-react";
 import { useMemo, useState } from "react";
+import { ApiError } from "@/api/client";
 import { mailApi } from "@/api/mail";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -9,7 +19,10 @@ import {
   formatSize,
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { MailAddress } from "@/types/mail";
+import type { ComposeMode, FolderRole, MailAddress } from "@/types/mail";
+import { ActionBar } from "./ActionBar";
+import { RsvpButtons } from "./RsvpButtons";
+import { useCompose } from "@/features/compose/compose-context";
 import { useMessage, useSetFlags } from "./hooks";
 
 function addressLine(list: MailAddress[]): string {
@@ -24,10 +37,12 @@ function buildDoc(html: string): string {
 
 export default function MessageReader({
   folder,
+  role,
   uid,
   onBack,
 }: {
   folder: string;
+  role: FolderRole;
   uid: number;
   onBack: () => void;
 }) {
@@ -39,6 +54,9 @@ export default function MessageReader({
     error,
   } = useMessage(folder, uid, showImages);
   const setFlags = useSetFlags(folder);
+  const compose = useCompose();
+  const [opening, setOpening] = useState<ComposeMode | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const doc = useMemo(
     () => (msg?.html ? buildDoc(msg.html) : null),
     [msg?.html],
@@ -71,10 +89,41 @@ export default function MessageReader({
   const meetUrl =
     inv?.meetUrl && inv.meetUrl.startsWith("https://") ? inv.meetUrl : null;
   const files = msg.attachments.filter((a) => !a.inline);
+  const canReplyAll = msg.to.length + msg.cc.length > 1;
+
+  async function startCompose(mode: ComposeMode) {
+    setOpening(mode);
+    setActionError(null);
+    try {
+      const d = await mailApi.composeDraft(folder, uid, mode);
+      compose.open({
+        to: d.to,
+        cc: d.cc,
+        subject: d.subject,
+        html: d.html,
+        inReplyTo: d.inReplyTo,
+        references: d.references,
+        original: {
+          folder,
+          uid,
+          kind: mode === "forward" ? "forward" : "reply",
+        },
+        forwardAttachments: mode === "forward" && files.length > 0,
+      });
+    } catch (err) {
+      setActionError(
+        err instanceof ApiError
+          ? err.message
+          : "Could not start the reply. Please try again.",
+      );
+    } finally {
+      setOpening(null);
+    }
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
-      <div className="flex items-start gap-2">
+      <div className="-mt-1 flex items-center gap-1">
         <Button
           variant="ghost"
           size="icon"
@@ -84,6 +133,9 @@ export default function MessageReader({
         >
           <ArrowLeft className="size-4" />
         </Button>
+        <ActionBar folder={folder} role={role} uids={[uid]} onDone={onBack} />
+      </div>
+      <div className="flex items-start gap-2">
         <h2 className="flex-1 text-xl font-semibold leading-snug">
           {msg.subject || "(no subject)"}
         </h2>
@@ -175,6 +227,14 @@ export default function MessageReader({
               <Video className="size-4" /> Join meeting
             </a>
           )}
+          {inv.canRespond && !inv.cancelled && (
+            <RsvpButtons
+              key={`${folder}:${uid}`}
+              folder={folder}
+              uid={uid}
+              current={msg.rsvp}
+            />
+          )}
         </div>
       )}
 
@@ -225,6 +285,43 @@ export default function MessageReader({
           ))}
         </div>
       )}
+
+      {actionError && (
+        <p role="alert" className="text-sm text-destructive">
+          {actionError}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2 pt-1">
+        <Button
+          variant="outline"
+          className="gap-2 rounded-full"
+          disabled={opening !== null}
+          onClick={() => void startCompose("reply")}
+        >
+          <Reply className="size-4" />{" "}
+          {opening === "reply" ? "Opening..." : "Reply"}
+        </Button>
+        {canReplyAll && (
+          <Button
+            variant="outline"
+            className="gap-2 rounded-full"
+            disabled={opening !== null}
+            onClick={() => void startCompose("replyAll")}
+          >
+            <ReplyAll className="size-4" />{" "}
+            {opening === "replyAll" ? "Opening..." : "Reply all"}
+          </Button>
+        )}
+        <Button
+          variant="outline"
+          className="gap-2 rounded-full"
+          disabled={opening !== null}
+          onClick={() => void startCompose("forward")}
+        >
+          <Forward className="size-4" />{" "}
+          {opening === "forward" ? "Opening..." : "Forward"}
+        </Button>
+      </div>
     </div>
   );
 }

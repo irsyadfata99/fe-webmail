@@ -3,9 +3,16 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type QueryClient,
 } from "@tanstack/react-query";
 import { mailApi } from "@/api/mail";
 import type { FlagName } from "@/types/mail";
+
+export function refreshMail(qc: QueryClient) {
+  for (const key of ["messages", "search", "message", "folders"]) {
+    void qc.invalidateQueries({ queryKey: [key] });
+  }
+}
 
 export function useFolders() {
   return useQuery({
@@ -25,7 +32,16 @@ export function useMessages(folder: string, page: number) {
   });
 }
 
-// Membuka surat sekaligus menandainya dibaca; daftar & hitungan folder disegarkan sesudahnya.
+export function useSearch(q: string, page: number) {
+  return useQuery({
+    queryKey: ["search", q, page],
+    queryFn: () => mailApi.search(q, "all", page),
+    enabled: q.length > 0,
+    placeholderData: keepPreviousData,
+  });
+}
+
+// Opening a message also marks it as read; lists and folder counts refresh afterwards.
 export function useMessage(folder: string, uid: number, images: boolean) {
   const qc = useQueryClient();
   return useQuery({
@@ -35,23 +51,30 @@ export function useMessage(folder: string, uid: number, images: boolean) {
         images,
         markSeen: true,
       });
-      void qc.invalidateQueries({ queryKey: ["messages", folder] });
-      void qc.invalidateQueries({ queryKey: ["folders"] });
+      for (const key of ["messages", "search", "folders"])
+        void qc.invalidateQueries({ queryKey: [key] });
       return msg;
     },
     staleTime: 60_000,
   });
 }
 
-export function useSetFlags(folder: string) {
+export function useSetFlags(defaultFolder: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { uid: number; add?: FlagName[]; remove?: FlagName[] }) =>
-      mailApi.setFlags(folder, [v.uid], v.add ?? [], v.remove ?? []),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["messages", folder] });
-      void qc.invalidateQueries({ queryKey: ["message", folder] });
-      void qc.invalidateQueries({ queryKey: ["folders"] });
-    },
+    mutationFn: (v: {
+      uid?: number;
+      uids?: number[];
+      folder?: string;
+      add?: FlagName[];
+      remove?: FlagName[];
+    }) =>
+      mailApi.setFlags(
+        v.folder ?? defaultFolder,
+        v.uids ?? (v.uid !== undefined ? [v.uid] : []),
+        v.add ?? [],
+        v.remove ?? [],
+      ),
+    onSuccess: () => refreshMail(qc),
   });
 }
