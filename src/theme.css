@@ -1,0 +1,178 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,600&family=Inter:wght@400;500;600&display=swap");
+
+/*
+ * Tema Motionegg Studios — emas dari logo, gaya glassmorphism, mode terang & gelap.
+ * Diimpor setelah index.css (lihat main.tsx) supaya menimpa token bawaan shadcn.
+ */
+
+:root {
+  --radius: 0.875rem;
+
+  /* Emas logo: #C8902A (gelap) → #F2B820 (terang) */
+  --gold: #c8902a;
+  --gold-bright: #f2b820;
+  --gold-deep: #9a6b12;
+
+  --background: #faf8f3;
+  --foreground: #1b1710;
+  --card: rgb(255 255 255 / 0.6);
+  --card-foreground: #1b1710;
+  --popover: #fffdf8;
+  --popover-foreground: #1b1710;
+  --primary: #c8902a;
+  --primary-foreground: #1b1305;
+  --secondary: rgb(200 144 40 / 0.12);
+  --secondary-foreground: #5c3f0a;
+  --muted: rgb(27 23 16 / 0.05);
+  --muted-foreground: #6b6355;
+  --accent: rgb(200 144 40 / 0.16);
+  --accent-foreground: #3d2a06;
+  --destructive: #c0392b;
+  --border: rgb(120 90 30 / 0.18);
+  --input: rgb(120 90 30 / 0.28);
+  --ring: #c8902a;
+
+  --sidebar: rgb(255 255 255 / 0.5);
+  --sidebar-foreground: #1b1710;
+  --sidebar-primary: #c8902a;
+  --sidebar-primary-foreground: #1b1305;
+  --sidebar-accent: rgb(200 144 40 / 0.16);
+  --sidebar-accent-foreground: #3d2a06;
+  --sidebar-border: rgb(120 90 30 / 0.18);
+  --sidebar-ring: #c8902a;
+
+  /* Kaca */
+  --glass-bg: rgb(255 255 255 / 0.55);
+  --glass-bg-strong: rgb(255 255 255 / 0.78);
+  --glass-border: rgb(255 255 255 / 0.7);
+  --glass-shadow: 0 8px 32px rgb(120 90 30 / 0.12);
+}
+
+.dark {
+  --background: #0d1216;
+  --foreground: #f3ede0;
+  --card: rgb(255 255 255 / 0.06);
+  --card-foreground: #f3ede0;
+  --popover: #171d22;
+  --popover-foreground: #f3ede0;
+  --primary: #e0a634;
+  --primary-foreground: #1a1204;
+  --secondary: rgb(224 166 52 / 0.14);
+  --secondary-foreground: #f0d79a;
+  --muted: rgb(255 255 255 / 0.06);
+  --muted-foreground: #a69f90;
+  --accent: rgb(224 166 52 / 0.18);
+  --accent-foreground: #f7e3b0;
+  --destructive: #ef6b5b;
+  --border: rgb(255 255 255 / 0.1);
+  --input: rgb(255 255 255 / 0.14);
+  --ring: #e0a634;
+
+  --sidebar: rgb(255 255 255 / 0.04);
+  --sidebar-foreground: #f3ede0;
+  --sidebar-primary: #e0a634;
+  --sidebar-primary-foreground: #1a1204;
+  --sidebar-accent: rgb(224 166 52 / 0.18);
+  --sidebar-accent-foreground: #f7e3b0;
+  --sidebar-border: rgb(255 255 255 / 0.1);
+  --sidebar-ring: #e0a634;
+
+  --glass-bg: rgb(255 255 255 / 0.06);
+  --glass-bg-strong: rgb(255 255 255 / 0.1);
+  --glass-border: rgb(255 255 255 / 0.12);
+  --glass-shadow: 0 8px 32px rgb(0 0 0 / 0.45);
+}
+
+/* Latar: gradasi lembut dengan cahaya emas supaya efek kaca terlihat */
+body {
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  background-color: var(--background);
+  background-image:
+    radial-gradient(
+      60rem 40rem at 10% -10%,
+      rgb(242 184 32 / 0.2),
+      transparent 60%
+    ),
+    radial-gradient(
+      50rem 40rem at 100% 10%,
+      rgb(200 144 40 / 0.14),
+      transparent 60%
+    ),
+    radial-gradient(
+      60rem 50rem at 50% 120%,
+      rgb(242 184 32 / 0.12),
+      transparent 60%
+    );
+  background-attachment: fixed;
+  color: var(--foreground);
+}
+.dark body {
+  background-image:
+    radial-gradient(
+      60rem 40rem at 10% -10%,
+      rgb(242 184 32 / 0.13),
+      transparent 60%
+    ),
+    radial-gradient(
+      50rem 40rem at 100% 10%,
+      rgb(200 144 40 / 0.1),
+      transparent 60%
+    ),
+    radial-gradient(
+      60rem 50rem at 50% 120%,
+      rgb(242 184 32 / 0.08),
+      transparent 60%
+    );
+}
+
+/* Utilitas kaca */
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
+}
+.glass-strong {
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  backdrop-filter: blur(24px) saturate(170%);
+}
+
+/* Card shadcn otomatis jadi kaca */
+[data-slot="card"] {
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
+}
+
+/* Tulisan merek (miring serif, mengikuti logo) */
+.brand-name {
+  font-family: "Fraunces", Georgia, serif;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--gold-deep);
+}
+.dark .brand-name {
+  color: var(--gold);
+}
+
+/* Browser tanpa dukungan blur: pakai latar lebih pekat */
+@supports not (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+  .glass,
+  .glass-strong,
+  [data-slot="card"] {
+    background: var(--popover);
+  }
+}
