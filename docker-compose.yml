@@ -1,0 +1,16 @@
+# Static frontend (the Vite build output) served by Nginx.
+services:
+  web:
+    image: nginx:1.27-alpine
+    container_name: mailweb-frontend
+    restart: unless-stopped
+    ports:
+      - "8090:80"
+    volumes:
+      - ./dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/index.html"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

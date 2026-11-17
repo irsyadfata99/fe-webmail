@@ -49,8 +49,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           await authApi.logout();
         } finally {
-          qc.clear();
+          // Mark the session as signed out first so the router moves to /login right away,
+          // then drop everything else cached for the previous user.
           qc.setQueryData(SESSION_KEY, null);
+          qc.removeQueries({
+            predicate: (q) => q.queryKey[0] !== SESSION_KEY[0],
+          });
         }
       },
     }),
